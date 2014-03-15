@@ -27,6 +27,7 @@ import org.aspectj.apache.bcel.generic.InstructionHandle;
 import org.aspectj.apache.bcel.generic.InstructionList;
 import org.aspectj.apache.bcel.generic.LineNumberTag;
 import org.aspectj.apache.bcel.generic.LocalVariableTag;
+import org.aspectj.bridge.IMessage;
 import org.aspectj.bridge.ISourceLocation;
 import org.aspectj.bridge.Message;
 import org.aspectj.weaver.Advice;
@@ -49,10 +50,13 @@ import org.aspectj.weaver.WeaverMessages;
 import org.aspectj.weaver.World;
 import org.aspectj.weaver.ast.Literal;
 import org.aspectj.weaver.ast.Test;
+import org.aspectj.weaver.model.AsmRelationshipProvider;
 import org.aspectj.weaver.patterns.ExactTypePattern;
 import org.aspectj.weaver.patterns.ExposedState;
 import org.aspectj.weaver.patterns.PerClause;
 import org.aspectj.weaver.patterns.Pointcut;
+
+import awesome.platform.IEffect;
 
 /**
  * Advice implemented for BCEL
@@ -61,7 +65,7 @@ import org.aspectj.weaver.patterns.Pointcut;
  * @author Jim Hugunin
  * @author Andy Clement
  */
-class BcelAdvice extends Advice {
+public class BcelAdvice extends Advice implements IEffect {
 
 	/**
 	 * If a match is not entirely statically determinable, this captures the runtime test that must succeed in order for the advice
@@ -762,4 +766,41 @@ class BcelAdvice extends Advice {
 		thrownExceptions = Collections.emptyList(); // !!! interaction with unit tests
 	}
 
+	//////////////////////////////////////////////
+
+	public void transform(BcelShadow shadow) {
+		implementOn(shadow);
+		//This is copied here from Shadow class.
+		reportAfterWeaving(shadow);
+	}
+
+	private void reportAfterWeaving(BcelShadow shadow) {
+		BcelWorld world = shadow.getWorld();
+		if (world.getCrossReferenceHandler() != null) {
+			world.getCrossReferenceHandler().addCrossReference(
+					this.getSourceLocation(), // What is being applied
+					shadow.getSourceLocation(), // Where is it being												// applied
+					determineRelKind().getName(), // What kind of advice?
+					((BcelAdvice) this).hasDynamicTests() // Is a
+															// runtime
+															// test
+															// being
+															// stuffed
+															// in the
+															// code?
+					);
+		}
+
+		// TAG: WeavingMessage
+		if (!world.getMessageHandler().isIgnoring(
+				IMessage.WEAVEINFO)) {
+			reportWeavingMessage(shadow);
+		}
+
+		if (world.getModel() != null) {
+			// System.err.println("munger: " + munger + " on " + this);
+			AsmRelationshipProvider.addAdvisedRelationship(world.getModelAsAsmManager(), shadow, this);
+		}
+
+    }
 }

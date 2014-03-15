@@ -17,5 +17,6 @@
   
   <modules>
   	<module>platform</module>
+  	<module>aspectjm</module>
   </modules>
 </project>

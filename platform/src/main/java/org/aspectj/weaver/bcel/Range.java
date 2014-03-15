@@ -21,7 +21,7 @@ import org.aspectj.apache.bcel.generic.InstructionList;
 import org.aspectj.apache.bcel.generic.InstructionTargeter;
 import org.aspectj.weaver.BCException;
 
-abstract class Range implements InstructionTargeter {
+public abstract class Range implements InstructionTargeter {
 
 	protected InstructionList body;
 	protected InstructionHandle start;
@@ -39,11 +39,11 @@ abstract class Range implements InstructionTargeter {
 		return body;
 	}
 
-	final InstructionHandle getStart() {
+	public final InstructionHandle getStart() {
 		return start;
 	}
 
-	final InstructionHandle getEnd() {
+	public final InstructionHandle getEnd() {
 		return end;
 	}
 
@@ -97,7 +97,7 @@ abstract class Range implements InstructionTargeter {
 		return ret;
 	}
 
-	void insert(InstructionList freshIl, Where where) {
+	public void insert(InstructionList freshIl, Where where) {
 		InstructionHandle h;
 		if (where == InsideBefore || where == OutsideBefore) {
 			h = getStart();
@@ -133,17 +133,17 @@ abstract class Range implements InstructionTargeter {
 		}
 	}
 
-	static InstructionHandle genStart(InstructionList body) {
+	public static InstructionHandle genStart(InstructionList body) {
 		InstructionHandle ih = body.insert(Range.RANGEINSTRUCTION);
 		setLineNumberFromNext(ih);
 		return ih;
 	}
 
-	static InstructionHandle genEnd(InstructionList body) {
+	public static InstructionHandle genEnd(InstructionList body) {
 		return body.append(Range.RANGEINSTRUCTION);
 	}
 
-	static InstructionHandle genStart(InstructionList body, InstructionHandle ih) {
+	public static InstructionHandle genStart(InstructionList body, InstructionHandle ih) {
 		if (ih == null) {
 			return genStart(body);
 		}
@@ -152,7 +152,7 @@ abstract class Range implements InstructionTargeter {
 		return freshIh;
 	}
 
-	static InstructionHandle genEnd(InstructionList body, InstructionHandle ih) {
+	public static InstructionHandle genEnd(InstructionList body, InstructionHandle ih) {
 		if (ih == null) {
 			return genEnd(body);
 		}
@@ -216,10 +216,10 @@ abstract class Range implements InstructionTargeter {
 
 	// ----
 
-	static final Where InsideBefore = new Where("insideBefore");
-	static final Where InsideAfter = new Where("insideAfter");
-	static final Where OutsideBefore = new Where("outsideBefore");
-	static final Where OutsideAfter = new Where("outsideAfter");
+	public static final Where InsideBefore = new Where("insideBefore");
+	public static final Where InsideAfter = new Where("insideAfter");
+	public static final Where OutsideBefore = new Where("outsideBefore");
+	public static final Where OutsideAfter = new Where("outsideAfter");
 
 	// ---- constants
 

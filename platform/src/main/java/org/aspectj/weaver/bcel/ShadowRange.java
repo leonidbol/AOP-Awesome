@@ -29,7 +29,7 @@ import org.aspectj.weaver.BCException;
 import org.aspectj.weaver.IntMap;
 import org.aspectj.weaver.Shadow;
 
-final class ShadowRange extends Range {
+public final class ShadowRange extends Range {
 
 	private BcelShadow shadow;
 
@@ -43,7 +43,7 @@ final class ShadowRange extends Range {
 		super(body);
 	}
 
-	protected void associateWithTargets(InstructionHandle start, InstructionHandle end) {
+	public void associateWithTargets(InstructionHandle start, InstructionHandle end) {
 		// assert body.contains(start) && body.contains(end);
 		this.start = start;
 		this.end = end;

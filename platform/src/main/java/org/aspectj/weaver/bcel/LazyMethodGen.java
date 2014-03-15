@@ -1755,14 +1755,14 @@ public final class LazyMethodGen implements Traceable {
 
 	// ----
 
-	boolean isAdviceMethod() {
+	public boolean isAdviceMethod() {
 		if (memberView == null) {
 			return false;
 		}
 		return memberView.getAssociatedShadowMunger() != null;
 	}
 
-	boolean isAjSynthetic() {
+	public boolean isAjSynthetic() {
 		if (memberView == null) {
 			return true;
 		}
@@ -1788,6 +1788,7 @@ public final class LazyMethodGen implements Traceable {
 		if (effectiveSignature != null) {
 			return effectiveSignature;
 		}
+		if (memberView == null) return null;
 		return memberView.getEffectiveSignature();
 	}
 

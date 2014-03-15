@@ -204,7 +204,7 @@ public class BcelWorld extends World implements Repository {
 		getMessageHandler().handleMessage(msg);
 	}
 
-	private boolean areTheSame(ISourceLocation locA, ISourceLocation locB) {
+	public static boolean areTheSame(ISourceLocation locA, ISourceLocation locB) {
 		if (locA == null) {
 			return locB == null;
 		}

@@ -82,6 +82,7 @@ import org.aspectj.weaver.Shadow;
 import org.aspectj.weaver.ShadowMunger;
 import org.aspectj.weaver.UnresolvedType;
 import org.aspectj.weaver.UnresolvedTypeVariableReferenceType;
+import org.aspectj.weaver.WeaverMessages;
 import org.aspectj.weaver.WeaverStateInfo;
 import org.aspectj.weaver.World;
 import org.aspectj.weaver.model.AsmRelationshipProvider;
@@ -90,7 +91,7 @@ import org.aspectj.weaver.patterns.ExactTypePattern;
 import org.aspectj.weaver.tools.Trace;
 import org.aspectj.weaver.tools.TraceFactory;
 
-class BcelClassWeaver implements IClassWeaver {
+public class BcelClassWeaver implements IClassWeaver {
 
 	private static Trace trace = TraceFactory.getTraceFactory().getTrace(BcelClassWeaver.class);
 
@@ -105,7 +106,7 @@ class BcelClassWeaver implements IClassWeaver {
 	// --------------------------------------------
 
 	private final LazyClassGen clazz;
-	private final List<ShadowMunger> shadowMungers;
+//	private final List<ShadowMunger> shadowMungers;
 	private final List<ConcreteTypeMunger> typeMungers;
 	private final List<ConcreteTypeMunger> lateTypeMungers;
 
@@ -120,7 +121,7 @@ class BcelClassWeaver implements IClassWeaver {
 	private final List<LazyMethodGen> addedLazyMethodGens = new ArrayList<LazyMethodGen>();
 	private final Set<ResolvedMember> addedDispatchTargets = new HashSet<ResolvedMember>();
 
-	private boolean inReweavableMode = false;
+	public static boolean inReweavableMode = false;
 
 	private List<IfaceInitList> addedSuperInitializersAsList = null;
 	private final Map<ResolvedType, IfaceInitList> addedSuperInitializers = new HashMap<ResolvedType, IfaceInitList>();
@@ -142,14 +143,14 @@ class BcelClassWeaver implements IClassWeaver {
 		super();
 		this.world = world;
 		this.clazz = clazz;
-		this.shadowMungers = shadowMungers;
+//		this.shadowMungers = shadowMungers;
 		this.typeMungers = typeMungers;
 		this.lateTypeMungers = lateTypeMungers;
 		this.ty = clazz.getBcelObjectType();
 		this.cpg = clazz.getConstantPool();
 		this.fact = clazz.getFactory();
 
-		indexShadowMungers();
+//		indexShadowMungers();
 
 		initializeSuperInitializerMap(ty.getResolvedTypeX());
 		if (!checkedXsetForLowLevelContextCapturing) {
@@ -198,7 +199,7 @@ class BcelClassWeaver implements IClassWeaver {
 	 * Process the shadow mungers into array 'buckets', each bucket represents a shadow kind and contains a list of shadowmungers
 	 * that could potentially apply at that shadow kind.
 	 */
-	private void indexShadowMungers() {
+	private void indexShadowMungers() {/*
 		// beware the annoying property that SHADOW_KINDS[i].getKey == (i+1) !
 		indexedShadowMungers = new List[Shadow.MAX_SHADOW_KIND + 1];
 		for (ShadowMunger shadowMunger : shadowMungers) {
@@ -215,7 +216,7 @@ class BcelClassWeaver implements IClassWeaver {
 					indexedShadowMungers[k].add(shadowMunger);
 				}
 			}
-		}
+		}*/
 	}
 
 	private boolean addSuperInitializer(ResolvedType onType) {
@@ -250,9 +251,9 @@ class BcelClassWeaver implements IClassWeaver {
 		}
 	}
 
-	private static class IfaceInitList implements PartialOrder.PartialComparable {
-		final ResolvedType onType;
-		List<ConcreteTypeMunger> list = new ArrayList<ConcreteTypeMunger>();
+	public static class IfaceInitList implements PartialOrder.PartialComparable {
+		public final ResolvedType onType;
+		public List<ConcreteTypeMunger> list = new ArrayList<ConcreteTypeMunger>();
 
 		IfaceInitList(ResolvedType onType) {
 			this.onType = onType;
@@ -414,7 +415,7 @@ class BcelClassWeaver implements IClassWeaver {
 			return false;
 		}
 
-		Set<String> aspectsAffectingType = null;
+		aspectsAffectingType = null;
 		if (inReweavableMode || clazz.getType().isAspect()) {
 			aspectsAffectingType = new HashSet<String>();
 		}
@@ -3212,7 +3213,7 @@ class BcelClassWeaver implements IClassWeaver {
 	// static ... so all worlds will share the config for the first one
 	// created...
 	private static boolean checkedXsetForLowLevelContextCapturing = false;
-	private static boolean captureLowLevelContext = false;
+	public static boolean captureLowLevelContext = false;
 
 	private boolean match(BcelShadow shadow, List<BcelShadow> shadowAccumulator) {
 		// Duplicate blocks - one with context one without, seems faster than multiple 'ifs'
@@ -3315,6 +3316,184 @@ class BcelClassWeaver implements IClassWeaver {
 	@Override
 	public String toString() {
 		return "BcelClassWeaver instance for : " + clazz;
+	}
+
+	///////////////////////////////////////
+
+	public BcelClassWeaver(BcelWorld world, LazyClassGen clazz) {
+		super();
+		// assert world == clazz.getType().getWorld()
+		this.world = world;
+		this.clazz = clazz;
+		//this.shadowMungers = shadowMungers;
+		this.typeMungers = clazz.getBcelObjectType().getResolvedTypeX().getInterTypeMungers();
+		this.lateTypeMungers = world.getCrosscuttingMembersSet().getLateTypeMungers();
+
+		this.ty = clazz.getBcelObjectType();
+		this.cpg = clazz.getConstantPool();
+		this.fact = clazz.getFactory();
+
+		//fastMatchShadowMungers(shadowMungers);
+
+		initializeSuperInitializerMap(ty.getResolvedTypeX());
+		if (!checkedXsetForLowLevelContextCapturing) {
+			Properties p = world.getExtraConfiguration();
+			if (p != null) {
+				String s = p.getProperty(World.xsetCAPTURE_ALL_CONTEXT, "false");
+				captureLowLevelContext = s.equalsIgnoreCase("true");
+				if (captureLowLevelContext)
+					world.getMessageHandler().handleMessage(
+							MessageUtil.info("[" + World.xsetCAPTURE_ALL_CONTEXT
+									+ "=true] Enabling collection of low level context for debug/crash messages"));
+			}
+			checkedXsetForLowLevelContextCapturing = true;
+		}
+	}
+
+	private Set aspectsAffectingType = new HashSet();
+
+	public Set getAspectsAffectingType() {
+		return this.aspectsAffectingType;
+    }
+
+    public List getAddedSuperInitializersAsList() {
+    	return this.addedSuperInitializersAsList;
+    }
+
+    public List getAddedThisInitializers() {
+    	return this.addedThisInitializers;
+    }
+
+    /** To be called by the AJ weaver before
+     * weaving advice.
+     * @return
+     */
+	public boolean weaveNormalITDs() {
+
+    	//SK: some bullshit
+    	//==============================================
+        if (clazz.isWoven() && !clazz.isReweavable()) {
+        	world.showMessage(IMessage.ERROR,
+        		  WeaverMessages.format(WeaverMessages.ALREADY_WOVEN,clazz.getType().getName()),
+				ty.getSourceLocation(), null);
+        	return false;
+        }
+
+        aspectsAffectingType = null;
+        if (inReweavableMode || clazz.getType().isAspect()) aspectsAffectingType = new HashSet();
+
+        boolean isChanged = false;
+
+        // we want to "touch" all aspects
+        if (clazz.getType().isAspect()) isChanged = true;
+
+        //SK: (1) applying ITDs
+        //      ==============================================
+        // start by munging all typeMungers
+        for (Iterator i = typeMungers.iterator(); i.hasNext(); ) {
+        	Object o = i.next();
+        	if ( !(o instanceof BcelTypeMunger) ) {
+        		//???System.err.println("surprising: " + o);
+        		continue;
+        	}
+        	BcelTypeMunger munger = (BcelTypeMunger)o;
+        	//SK: NOTE: At this point initializers lists are filled with mungers,
+        	// namely addedClassInitializers, addedThisInitializers, and 
+        	// addedSuperInitializers.get(munger's type).list
+        	//
+        	//More specifically: 
+        	//munger.munge(this) -> munger.mungeNewField(this, munger) -> 
+        	//-> this.addInitializer(munger) ->  add the munger into 
+        	// one of the three list.
+
+        	boolean typeMungerAffectedType = munger.munge(this);
+        	if (typeMungerAffectedType) {
+        		isChanged = true;
+        		if (inReweavableMode || clazz.getType().isAspect()) aspectsAffectingType.add(munger.getAspectType().getName());
+        	}
+        }
+
+
+        //SK: (1.1) Seems like these add annotations to class members
+        //      ==============================================
+        // Weave special half type/half shadow mungers...
+        isChanged = weaveDeclareAtMethodCtor(clazz) || isChanged;
+        isChanged = weaveDeclareAtField(clazz)      || isChanged;
+        
+
+        // XXX do major sort of stuff
+        // sort according to:  Major:  type hierarchy
+        //                     within each list:  dominates
+        // don't forget to sort addedThisInitialiers according to dominates
+        addedSuperInitializersAsList = new ArrayList(addedSuperInitializers.values());
+        addedSuperInitializersAsList = PartialOrder.sort(addedSuperInitializersAsList);
+        if (addedSuperInitializersAsList == null) {
+        	throw new BCException("circularity in inter-types");
+        }
+        //SK: Preparing class for weaving.
+        // For now I'll ignore this part.
+        // I need to consider if this part is actually
+        // part of MM weaving preparation process.
+        //      ==============================================
+        // this will create a static initializer if there isn't one
+        // this is in just as bad taste as NOPs
+        LazyMethodGen staticInit = clazz.getStaticInitializer();
+        staticInit.getBody().insert(genInitInstructions(addedClassInitializers, true));
+
+        //SK: That's where the MM should go (for  now).
+        // Later, the MM should be expanded to cover previous
+        // actions too, and allow collaborative program preparation,
+        // and collaborative ITDs changes.
+        // Right now I'm concerned with collaborative advice weaving.
+        return isChanged;
+	}
+
+	/** To be called by the AJ weaver after weaving advice.
+	 *
+	 * @param isChanged specifies whether class is changed at previous weaving stages.
+	 * @return
+	 */
+	public boolean weaveLateITDs(boolean isChanged) {
+       //SK: (4) late type mungers.
+		// Seem to add stuff into aspects to achieve PerCflow, PerObject, PerTypeWithn, and PerSingleton
+		// semantics of aspect creation, and also extra methods (e.g., aspectOf()).
+		// Not really advice weaving.
+       //      ==============================================
+
+       // now proceed with late type mungers
+       if (lateTypeMungers != null) {
+           for (Iterator i = lateTypeMungers.iterator(); i.hasNext(); ) {
+               BcelTypeMunger munger = (BcelTypeMunger)i.next();
+               if (munger.matches(clazz.getType())) {
+                   boolean typeMungerAffectedType = munger.munge(this);
+                   if (typeMungerAffectedType) {
+                       isChanged = true;
+                       if (inReweavableMode || clazz.getType().isAspect()) aspectsAffectingType.add(munger.getAspectType().getName());
+                   }
+               }
+           }
+       }
+
+       //FIXME AV - see #75442, for now this is not enough to fix the bug, comment that out until we really fix it
+//       // flush to save some memory
+//       PerObjectInterfaceTypeMunger.unregisterFromAsAdvisedBy(clazz.getType());
+
+		// finally, if we changed, we add in the introduced methods.
+       if (isChanged) {
+       	clazz.getOrCreateWeaverStateInfo(inReweavableMode);
+			weaveInAddedMethods(); // FIXME asc are these potentially affected by declare annotation?
+       }
+
+       if (inReweavableMode) {
+       	WeaverStateInfo wsi = clazz.getOrCreateWeaverStateInfo(true);
+       	wsi.addAspectsAffectingType(aspectsAffectingType);
+       	wsi.setUnwovenClassFileData(ty.getJavaClass().getBytes());
+       	wsi.setReweavable(true);
+       } else {
+       	clazz.getOrCreateWeaverStateInfo(false).setReweavable(false);
+       }
+
+       return isChanged;
 	}
 
 }

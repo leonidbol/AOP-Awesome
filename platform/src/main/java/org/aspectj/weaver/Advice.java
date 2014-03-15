@@ -15,8 +15,15 @@ package org.aspectj.weaver;
 import java.util.Collections;
 import java.util.List;
 
+import org.aspectj.asm.IRelationship;
+import org.aspectj.asm.IRelationship.Kind;
 import org.aspectj.bridge.IMessage;
 import org.aspectj.bridge.ISourceLocation;
+import org.aspectj.bridge.Message;
+import org.aspectj.bridge.WeaveMessage;
+import org.aspectj.weaver.bcel.BcelAdvice;
+import org.aspectj.weaver.bcel.BcelWorld;
+import org.aspectj.weaver.bcel.Utility;
 import org.aspectj.weaver.patterns.AndPointcut;
 import org.aspectj.weaver.patterns.PerClause;
 import org.aspectj.weaver.patterns.Pointcut;
@@ -512,4 +519,95 @@ public abstract class Advice extends ShadowMunger {
 
 	public abstract boolean hasDynamicTests();
 
+	/////////////////////////////////////////
+
+	/** Moved from the Shadow class */
+	public IRelationship.Kind determineRelKind() {
+		AdviceKind ak = this.getKind();
+		if (ak.getKey()==AdviceKind.Before.getKey())
+				return Kind.ADVICE_BEFORE;
+		else if (ak.getKey()==AdviceKind.After.getKey())
+				return Kind.ADVICE_AFTER;
+		else if (ak.getKey()==AdviceKind.AfterThrowing.getKey())
+				return Kind.ADVICE_AFTERTHROWING;
+		else if (ak.getKey()==AdviceKind.AfterReturning.getKey())
+				return Kind.ADVICE_AFTERRETURNING;
+		else if (ak.getKey()==AdviceKind.Around.getKey())
+				return Kind.ADVICE_AROUND;
+		else if (ak.getKey()==AdviceKind.CflowEntry.getKey() ||
+	            ak.getKey()==AdviceKind.CflowBelowEntry.getKey() ||
+	            ak.getKey()==AdviceKind.InterInitializer.getKey() ||
+	            ak.getKey()==AdviceKind.PerCflowEntry.getKey() ||
+	            ak.getKey()==AdviceKind.PerCflowBelowEntry.getKey() ||
+	            ak.getKey()==AdviceKind.PerThisEntry.getKey() ||
+	            ak.getKey()==AdviceKind.PerTargetEntry.getKey() ||
+	            ak.getKey()==AdviceKind.Softener.getKey() ||
+	            ak.getKey()==AdviceKind.PerTypeWithinEntry.getKey()) {
+	        //System.err.println("Dont want a message about this: "+ak);
+	        return null;
+		}
+		throw new RuntimeException("Shadow.determineRelKind: What the hell is it? "+ak);
+	}
+
+	/** Moved from the Shadow class */
+	protected void reportWeavingMessage(Shadow shadow) {
+		Advice advice = (Advice)this;
+		AdviceKind aKind = advice.getKind();
+		// Only report on interesting advice kinds ...
+		if (aKind == null || advice.getConcreteAspect()==null) {
+			// We suspect someone is programmatically driving the weaver
+			// (e.g. IdWeaveTestCase in the weaver testcases)
+			return;
+		}
+		if (!( aKind.equals(AdviceKind.Before) ||
+		       aKind.equals(AdviceKind.After) ||
+		       aKind.equals(AdviceKind.AfterReturning) ||
+		       aKind.equals(AdviceKind.AfterThrowing) ||
+		       aKind.equals(AdviceKind.Around) ||
+		       aKind.equals(AdviceKind.Softener))) return;
+
+		// synchronized blocks are implemented with multiple monitor_exit instructions in the bytecode
+		// (one for normal exit from the method, one for abnormal exit), we only want to tell the user
+		// once we have advised the end of the sync block, even though under the covers we will have
+		// woven both exit points
+		if (shadow.kind==Shadow.SynchronizationUnlock) {
+			if (advice.lastReportedMonitorExitJoinpointLocation==null) {
+				// this is the first time through, let's continue...
+				advice.lastReportedMonitorExitJoinpointLocation = shadow.getSourceLocation();
+			} else {
+			  if (BcelWorld.areTheSame(shadow.getSourceLocation(),advice.lastReportedMonitorExitJoinpointLocation)) {
+				  // Don't report it again!
+				  advice.lastReportedMonitorExitJoinpointLocation=null;
+				  return;
+			  }
+			  // hmmm, this means some kind of nesting is going on, urgh
+			  advice.lastReportedMonitorExitJoinpointLocation=shadow.getSourceLocation();
+			}
+		}
+
+		String description = advice.getKind().toString();
+		String advisedType = shadow.getEnclosingType().getName();
+		String advisingType= advice.getConcreteAspect().getName();
+		Message msg = null;
+		if (advice.getKind().equals(AdviceKind.Softener)) {
+			msg = WeaveMessage.constructWeavingMessage(
+			  WeaveMessage.WEAVEMESSAGE_SOFTENS,
+			    new String[]{advisedType,Utility.beautifyLocation(shadow.getSourceLocation()),
+					  advisingType,Utility.beautifyLocation(getSourceLocation())},
+				advisedType,
+				advisingType);
+		} else {
+			boolean runtimeTest = ((BcelAdvice)advice).hasDynamicTests();
+			String joinPointDescription = shadow.toString();
+		    msg = WeaveMessage.constructWeavingMessage(WeaveMessage.WEAVEMESSAGE_ADVISES,
+		    		new String[]{ joinPointDescription, advisedType, Utility.beautifyLocation(shadow.getSourceLocation()),
+				            description,
+				            advisingType,Utility.beautifyLocation(getSourceLocation()),
+				            (runtimeTest?" [with runtime test]":"")},
+					advisedType,
+					advisingType);
+				         // Boolean.toString(runtimeTest)});
+		}
+		shadow.getIWorld().getMessageHandler().handleMessage(msg);
+	}
 }
