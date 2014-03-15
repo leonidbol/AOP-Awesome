@@ -95,6 +95,8 @@ import org.aspectj.weaver.patterns.WithinPointcut;
 import org.aspectj.weaver.tools.Trace;
 import org.aspectj.weaver.tools.TraceFactory;
 
+import awesome.platform.MultiMechanism;
+
 /**
  * 
  * @author PARC
@@ -130,6 +132,8 @@ public class BcelWeaver {
 	private ZipOutputStream zipOutputStream;
 	private CustomMungerFactory customMungerFactory;
 
+	private MultiMechanism MM;
+
 	public BcelWeaver(BcelWorld world) {
 		super();
 		if (trace.isTraceEnabled()) {
@@ -137,6 +141,7 @@ public class BcelWeaver {
 		}
 		this.world = world;
 		this.xcutSet = world.getCrosscuttingMembersSet();
+		this.MM = new MultiMechanism(world);
 		if (trace.isTraceEnabled()) {
 			trace.exit("<init>");
 		}
@@ -1688,8 +1693,9 @@ public class BcelWeaver {
 					boolean isChanged = false;
 
 					if (mightNeedToWeave) {
-						isChanged = BcelClassWeaver.weave(world, clazz, shadowMungers, typeMungers, lateTypeMungerList,
-								inReweavableMode);
+						isChanged = MM.transform(clazz);
+						/*isChanged = BcelClassWeaver.weave(world, clazz, shadowMungers, typeMungers, lateTypeMungerList,
+								inReweavableMode);*/
 					}
 
 					checkDeclareTypeErrorOrWarning(world, classType);

@@ -70,6 +70,8 @@ import org.aspectj.weaver.patterns.NotPointcut;
 import org.aspectj.weaver.patterns.OrPointcut;
 import org.aspectj.weaver.patterns.ThisOrTargetPointcut;
 
+import awesome.platform.IEffect;
+
 /*
  * Some fun implementation stuff:
  * 
@@ -3404,4 +3406,240 @@ public class BcelShadow extends Shadow {
 	public String getActualTargetType() {
 		return actualInstructionTargetType;
 	}
+
+	/////////////////////////////////////
+
+	public static BcelShadow makeFieldGet(
+            BcelWorld world,
+            LazyMethodGen enclosingMethod,
+            InstructionHandle getHandle,
+            BcelShadow enclosingShadow) 
+    {
+		LazyClassGen clazz = enclosingMethod.getEnclosingClass(); 
+		ConstantPool cpg = clazz.getConstantPool();
+		FieldInstruction fi = (FieldInstruction) getHandle.getInstruction();
+		Member field = BcelWorld.makeFieldJoinPointSignature(clazz, fi);
+		ResolvedMember resolvedField = field.resolve(world);
+		
+        final InstructionList body = enclosingMethod.getBody();
+        BcelShadow s =
+            new BcelShadow(
+                world,
+                FieldGet,
+                resolvedField,
+//                BcelWorld.makeFieldSignature(
+//                    enclosingMethod.getEnclosingClass(),
+//                    (FieldInstruction) getHandle.getInstruction()),
+                enclosingMethod,
+                enclosingShadow);
+        ShadowRange r = new ShadowRange(body);
+        r.associateWithShadow(s);
+        r.associateWithTargets(
+            Range.genStart(body, getHandle),
+            Range.genEnd(body, getHandle));
+        retargetAllBranches(getHandle, r.getStart());
+        return s;
+    }
+
+	public void prepareForMungers(List<IEffect> mungers) {
+		// if we're a constructor call, we need to remove the new:dup or the new:dup_x1:swap,
+		// and store all our
+		// arguments on the frame.
+
+		// ??? This is a bit of a hack (for the Java langauge). We do this because
+		// we sometime add code "outsideBefore" when dealing with weaving join points. We only
+		// do this for exposing state that is on the stack. It turns out to just work for
+		// everything except for constructor calls and exception handlers. If we were to clean
+		// this up, every ShadowRange would have three instructionHandle points, the start of
+		// the arg-setup code, the start of the running code, and the end of the running code.
+		if (getKind() == ConstructorCall) {
+		    //For constructor call, the 
+			if (!this.getSignature().getDeclaringType().isArray())
+			//The shadow interval is preceded by specific instructions 
+		    //with the outermost NEW:
+			//NEW,...,INVOKE <new>, where INVOKE<new> is the shadow instruction.
+			//The following method basically removes all preceding instructions
+			//until (inclusively) NEW:
+			//NEW,...,INVOKE <new> => INVOKE <new>
+			//(in fact, this is a little more complicated. The idea is to
+			//find [NEW, DUP] or [NEW, DUP_X1, SWAP] instructions for
+			//this shadow, and to remove them!
+			deleteNewAndDup(); // no new/dup for new array construction
+			
+			//creates a bunch of temp variables, one per argument of
+			//the join point, allocates memory in the enclosingMethod's frame
+			//for them, and initializes them by inserting store instructions
+			//right before the shadow's range.
+			//SK: not sure if we need it here, because we would have it anyway later
+			initializeArgVars();
+		} else if (getKind() == PreInitialization) { // pr74952
+			ShadowRange range = getRange();
+			range.insert(InstructionConstants.NOP, Range.InsideAfter);
+		} else if (getKind() == ExceptionHandler) {
+
+			ShadowRange range = getRange();
+			InstructionList body = range.getBody();
+			InstructionHandle start = range.getStart();
+
+			// Create a store instruction to put the value from the top of the
+			// stack into a local variable slot. This is a trimmed version of
+			// what is in initializeArgVars() (since there is only one argument
+			// at a handler jp and only before advice is supported) (pr46298)
+			argVars = new BcelVar[1];
+			// int positionOffset = (hasTarget() ? 1 : 0) + ((hasThis() && !getKind().isTargetSameAsThis()) ? 1 : 0);
+			UnresolvedType tx = getArgType(0);
+			argVars[0] = genTempVar(tx, "ajc$arg0");
+			InstructionHandle insertedInstruction = range.insert(argVars[0].createStore(getFactory()), Range.OutsideBefore);
+
+			// Now the exception range starts just after our new instruction.
+			// The next bit of code changes the exception range to point at
+			// the store instruction
+			InstructionTargeter[] targeters = start.getTargeters().toArray(new InstructionTargeter[0]);
+			for (int i = 0; i < targeters.length; i++) {
+				InstructionTargeter t = targeters[i];
+				if (t instanceof ExceptionRange) {
+					ExceptionRange er = (ExceptionRange) t;
+					er.updateTarget(start, insertedInstruction, body);
+				}
+			}
+		}
+
+		// now we ask each munger to request our state
+		isThisJoinPointLazy = true;// world.isXlazyTjp(); // lazy is default now
+
+		badAdvice = null;
+		
+		//SK: specializing all advice pieces for this shadow
+		//this includes creating a thisJoinPointVar (through calling
+		//requireThisJoinPoint on this shadow object),
+		//and other variables (e.g., thisJoinPointStaticPart,
+		//arguments). Overall, this specialization calls a lot of
+		// methods back on this shadow object.
+		//specializeOn generally inserts instructions before the shadow that
+		//store argument values and target value in corresponding temp variables.
+		for (IEffect munger:mungers) munger.specializeOn(this);
+		
+		//SK: this inserts instructions right before the
+		//shadow's range that create tjp object, and place it on the stack
+		initializeThisJoinPoint(mungers);
+
+
+		if (thisJoinPointVar != null && !isThisJoinPointLazy && badAdvice != null && badAdvice.size() > 1) {
+			// something stopped us making it a lazy tjp
+			// can't build tjp lazily, no suitable test...
+			int valid = 0;
+			for (Iterator iter = badAdvice.iterator(); iter.hasNext();) {
+				BcelAdvice element = (BcelAdvice) iter.next();
+				ISourceLocation sLoc = element.getSourceLocation();
+				if (sLoc != null && sLoc.getLine() > 0)
+					valid++;
+			}
+			if (valid != 0) {
+				ISourceLocation[] badLocs = new ISourceLocation[valid];
+				int i = 0;
+				for (Iterator iter = badAdvice.iterator(); iter.hasNext();) {
+					BcelAdvice element = (BcelAdvice) iter.next();
+					ISourceLocation sLoc = element.getSourceLocation();
+					if (sLoc != null)
+						badLocs[i++] = sLoc;
+				}
+				world.getLint().multipleAdviceStoppingLazyTjp
+						.signal(new String[] { this.toString() }, getSourceLocation(), badLocs);
+			}
+		}
+		badAdvice = null;
+
+		// If we are an expression kind, we require our target/arguments on the stack
+		// before we do our actual thing. However, they may have been removed
+		// from the stack as the shadowMungers have requested state.
+		// if any of our shadowMungers requested either the arguments or target,
+		// the munger will have added code
+		// to pop the target/arguments into temporary variables, represented by
+		// targetVar and argVars. In such a case, we must make sure to re-push the
+		// values.
+
+		// If we are nonExpressionKind, we don't expect arguments on the stack
+		// so this is moot. If our argVars happen to be null, then we know that
+		// no ShadowMunger has squirrelled away our arguments, so they're still
+		// on the stack.
+		InstructionFactory fact = getFactory();
+		if (getKind().argsOnStack() && argVars != null) {
+
+			// Special case first (pr46298). If we are an exception handler and the instruction
+			// just after the shadow is a POP then we should remove the pop. The code
+			// above which generated the store instruction has already cleared the stack.
+			// We also don't generate any code for the arguments in this case as it would be
+			// an incorrect aload.
+			if (getKind() == ExceptionHandler && range.getEnd().getNext().getInstruction().equals(InstructionConstants.POP)) {
+				// easier than deleting it ...
+				range.getEnd().getNext().setInstruction(InstructionConstants.NOP);
+			} else {
+				range.insert(BcelRenderer.renderExprs(fact, world, argVars), Range.InsideBefore);
+				if (targetVar != null) {
+					range.insert(BcelRenderer.renderExpr(fact, world, targetVar), Range.InsideBefore);
+				}
+				if (getKind() == ConstructorCall) {
+					if (!world.isJoinpointArrayConstructionEnabled() || !this.getSignature().getDeclaringType().isArray()) {
+						range.insert(InstructionFactory.createDup(1), Range.InsideBefore);
+						range.insert(fact.createNew((ObjectType) BcelWorld.makeBcelType(getSignature().getDeclaringType())),
+								Range.InsideBefore);
+					}
+				}
+			}
+		}
+	}
+
+	void initializeThisJoinPoint(List<IEffect> mungers) {
+		if (thisJoinPointVar == null)
+			return;
+
+		if (isThisJoinPointLazy) {
+			isThisJoinPointLazy = checkLazyTjp(mungers);
+		}
+
+		if (isThisJoinPointLazy) {
+			appliedLazyTjpOptimization = true;
+			createThisJoinPoint(); // make sure any state needed is initialized, but throw the instructions out
+
+			if (lazyTjpConsumers == 1)
+				return; // special case only one lazyTjpUser
+
+			InstructionFactory fact = getFactory();
+			InstructionList il = new InstructionList();
+			il.append(InstructionConstants.ACONST_NULL);
+			il.append(thisJoinPointVar.createStore(fact));
+			range.insert(il, Range.OutsideBefore);
+		} else {
+			appliedLazyTjpOptimization = false;
+			InstructionFactory fact = getFactory();
+			InstructionList il = createThisJoinPoint();
+			il.append(thisJoinPointVar.createStore(fact));
+			range.insert(il, Range.OutsideBefore);
+		}
+	}
+
+    private boolean checkLazyTjp(List<IEffect> mungers) {    	
+		// check for around advice
+    	for (IEffect munger:mungers) {
+			if (munger instanceof Advice) {
+				Advice advice = (Advice)munger;
+				if ( advice.getKind() == AdviceKind.Around) {
+					if (advice.getSourceLocation()!=null) { // do we know enough to bother reporting?
+						if (world.getLint().canNotImplementLazyTjp.isEnabled()) {
+							world.getLint().canNotImplementLazyTjp.signal(
+							    new String[] {toString()},
+							    getSourceLocation(),
+							    new ISourceLocation[] { advice.getSourceLocation() }
+							);
+						}
+					}
+					return false;
+				}
+			}
+		}
+
+		return true;
+	}
+
 }
+
