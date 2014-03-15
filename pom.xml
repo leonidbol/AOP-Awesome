@@ -15,4 +15,7 @@
   <description></description>
 
   
+  <modules>
+  	<module>platform</module>
+  </modules>
 </project>
