@@ -147,13 +147,10 @@ public abstract class COOLEffect implements IEffect {
 		BcelVar returnValueVar = null;
     	InstructionHandle lastReturnHandle = (InstructionHandle)returns.get(returns.size() - 1);
     	Instruction newReturnInstruction = Utility.copyInstruction(lastReturnHandle.getInstruction());
-    	System.out.println("here3 " + shadow.getReturnType());
     	if (!shadow.getReturnType().equals(ResolvedType.VOID)) {
-    		System.out.println("here31");
         	returnValueVar = shadow.genTempVar(shadow.getReturnType());
             returnValueVar.appendLoad(returnInstructions,shadow.getFactory());
     	} else {
-    		System.out.println("here32");
     		returnInstructions.append(newReturnInstruction);
     	}
     	returnInstructions.append(newReturnInstruction);
