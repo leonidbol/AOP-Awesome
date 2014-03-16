@@ -1136,6 +1136,7 @@ public class BcelWeaver {
 
 		requestor.weavingAspects();
 		ContextToken aspectToken = CompilationAndWeavingContext.enteringPhase(CompilationAndWeavingContext.WEAVING_ASPECTS, "");
+		MM.setInputFiles(input);
 		// first weave into aspects
 		for (Iterator<UnwovenClassFile> i = input.getClassFileIterator(); i.hasNext();) {
 			UnwovenClassFile classFile = i.next();
@@ -1684,8 +1685,10 @@ public class BcelWeaver {
 			boolean mightNeedBridgeMethods = world.isInJava5Mode() && !classType.isInterface()
 					&& resolvedClassType.getInterTypeMungersIncludingSupers().size() > 0;
 
+					System.out.println("here1"); mightNeedToWeave=true;
 			LazyClassGen clazz = null;
 			if (mightNeedToWeave || mightNeedBridgeMethods) {
+				System.out.println("here2");
 				clazz = classType.getLazyClassGen();
 				// System.err.println("got lazy gen: " + clazz + ", " +
 				// clazz.getWeaverState());
@@ -1693,6 +1696,7 @@ public class BcelWeaver {
 					boolean isChanged = false;
 
 					if (mightNeedToWeave) {
+						System.out.println("here3");
 						isChanged = MM.transform(clazz);
 						/*isChanged = BcelClassWeaver.weave(world, clazz, shadowMungers, typeMungers, lateTypeMungerList,
 								inReweavableMode);*/

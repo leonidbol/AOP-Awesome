@@ -122,7 +122,7 @@ public abstract class Range implements InstructionTargeter {
 		return insert(i, InsideAfter);
 	}
 
-	void append(InstructionList i) {
+	public void append(InstructionList i) {
 		insert(i, InsideAfter);
 	}
 

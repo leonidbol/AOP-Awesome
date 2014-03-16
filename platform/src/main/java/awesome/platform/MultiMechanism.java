@@ -90,7 +90,6 @@ public class MultiMechanism {
 			superOrThisCall = findSuperOrThisCall(mg);
 			// enclosing.getRange().getStart().getPrev();
 		}
-		
         InstructionHandle last = il.getEnd();
         if (last!=null) last = last.getNext();
 		for (InstructionHandle h = il.getStart(); h != last; h = h.getNext()) {
@@ -133,7 +132,6 @@ public class MultiMechanism {
 		// assumption:
 		LazyClassGen clazz = mg.getEnclosingClass();
 		ConstantPool cpg = clazz.getConstantPool();
-
 		Instruction i = ih.getInstruction();
 		if ((i instanceof FieldInstruction)) {
 			FieldInstruction fi = (FieldInstruction) i;

@@ -5,7 +5,7 @@
     <artifactId>awesome</artifactId>
     <version>1.0-SNAPSHOT</version>
   </parent>
-  <artifactId>platform</artifactId>
+  <artifactId>coolm</artifactId>
 
   <build>
     <plugins>
@@ -31,16 +31,11 @@
 
   <dependencies>
     <dependency>
-            <groupId>commons-logging</groupId>
-            <artifactId>commons-logging</artifactId>
-            <version>1.1.3</version>
+        <groupId>org.openu</groupId>
+        <artifactId>platform</artifactId>
+        <version>1.0-SNAPSHOT</version>
     </dependency>
     <dependency>
-		<groupId>org.ow2.asm</groupId>
-		<artifactId>asm</artifactId>
-		<version>4.0</version>
-    </dependency>
-     <dependency>
       <groupId>org.aspectj</groupId>
       <artifactId>aspectjrt</artifactId>
       <version>1.7.4</version>

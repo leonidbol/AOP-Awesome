@@ -3641,5 +3641,10 @@ public class BcelShadow extends Shadow {
 		return true;
 	}
 
+    ////////////////////////////////
+
+    public BcelVar getThisVarField() {
+    	return thisVar;
+    }
 }
 

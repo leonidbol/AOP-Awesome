@@ -375,4 +375,10 @@ public class JoinPointSignature implements ResolvedMember {
 	public boolean equalsApartFromDeclaringType(Object other) {
 		return realMember.equalsApartFromDeclaringType(other);
 	}
+
+	//////////////////////////
+
+	public boolean isStatic() {
+		return realMember.isStatic();
+	}
 }

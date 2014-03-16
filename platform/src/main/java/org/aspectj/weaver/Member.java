@@ -90,4 +90,7 @@ public interface Member extends Comparable<Member> {
 
 	public int compareTo(Member other);
 
+	////////////////////////////////////
+
+	public boolean isStatic();
 }

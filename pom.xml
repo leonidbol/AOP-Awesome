@@ -18,5 +18,6 @@
   <modules>
   	<module>platform</module>
   	<module>aspectjm</module>
+  	<module>coolm</module>
   </modules>
 </project>

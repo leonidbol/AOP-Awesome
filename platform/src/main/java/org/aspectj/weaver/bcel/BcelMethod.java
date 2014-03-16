@@ -49,7 +49,7 @@ import org.aspectj.weaver.World;
 import org.aspectj.weaver.bcel.BcelGenericSignatureToTypeXConverter.GenericSignatureFormatException;
 
 //public final 
-class BcelMethod extends ResolvedMemberImpl {
+public class BcelMethod extends ResolvedMemberImpl {
 
 	private Method method;
 
