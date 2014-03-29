@@ -1,4 +1,4 @@
-package cool.runtime;
+package cool;
 import java.lang.annotation.*;
 
 @Retention(RetentionPolicy.CLASS)

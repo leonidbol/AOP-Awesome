@@ -1,4 +1,4 @@
-package cool.runtime;
+package cool;
 
 import java.util.List;
 import java.util.ArrayList;
